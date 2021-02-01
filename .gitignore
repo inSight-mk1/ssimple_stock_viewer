@@ -1,4 +1,5 @@
 stock_list.txt
 index_list.txt
-.idea/
+.*/
+.*
 __pycache__/

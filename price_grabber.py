@@ -1,5 +1,6 @@
 import requests
-
+import os
+os.environ['NO_PROXY'] = 'hq.sinajs.cn'
 
 class Price_Grabber(object):
     def __init__(self):
@@ -13,11 +14,16 @@ class Price_Grabber(object):
     def parse_text(self, text: str):
         try:
             left_start_idx = text.index('="') + 2
+            ts_code_idx = left_start_idx - 8
+            ts_code = text[ts_code_idx:ts_code_idx+6]
             info_text = text[left_start_idx:]
             s_texts = info_text.split(',')
             last_day_price_f = float(s_texts[2])
             current_price_f = float(s_texts[3])
-            price_s = '%.2f' % current_price_f
+            if ts_code[0] in ['5', '1']:
+                price_s = '%.3f' % current_price_f
+            else:
+                price_s = '%.2f' % current_price_f
             ratio = (current_price_f - last_day_price_f) / last_day_price_f * 100
             ratio_s = '%.2f%%' % ratio
             today_high_ratio = (float(s_texts[4]) - last_day_price_f) / last_day_price_f * 100
