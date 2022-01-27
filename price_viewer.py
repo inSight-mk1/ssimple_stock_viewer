@@ -36,10 +36,12 @@ if __name__ == '__main__':
 
     while (True):
         stock_table = main_table[:]
-        for i, stock_code in enumerate(stock_list):
+        res_list = pg.grab(stock_list)
+        for i, res in enumerate(res_list):
             ratio = '-100.00%'
             rf = -100.0
-            res = pg.grab(stock_code)
+            stock_code = stock_list[i]
+            # res = pg.grab(stock_code)
             try:
                 ratio = res['ratio']
                 rf = float(ratio[:-1])
@@ -59,8 +61,11 @@ if __name__ == '__main__':
                                    res['current_price'], ratio, volatility_s,
                                    res['today_low'], res['today_high'], res['current_time'], rf])
         index_table = main_table[:]
-        for i, index_code in enumerate(index_list):
-            res = pg.grab(index_code)
+
+        res_list = pg.grab(index_list)
+        for i, res in enumerate(res_list):
+            # res = pg.grab(index_code)
+            index_code = index_list[i]
             try:
                 index_tdl[i].push(float(res['ratio'][:-1]))
             except:
@@ -85,4 +90,4 @@ if __name__ == '__main__':
                               'today_low', 'today_high', 'time']))
         print(stock_table.get_string(fields=['stock_code', ' stock_name ', ' price ', ' ratio ', 'volatility',
                               'today_low', 'today_high', 'time'], sortby="ratio_f"))
-        time.sleep(3.25)
+        time.sleep(5.0)

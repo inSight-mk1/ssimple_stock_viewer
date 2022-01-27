@@ -1,15 +1,40 @@
 import requests
 import os
-os.environ['NO_PROXY'] = 'hq.sinajs.cn'
+import easyquotation
+# os.environ['NO_PROXY'] = 'hq.sinajs.cn'
 
 class Price_Grabber(object):
     def __init__(self):
-        self.interface_url = 'http://hq.sinajs.cn/list='
+        self.quotation = easyquotation.use('tencent')  # 新浪 ['sina'] 腾讯 ['tencent', 'qq']
+        # self.interface_url = 'http://hq.sinajs.cn/list='
 
-    def grab(self, stock_code):
-        url = self.interface_url + stock_code
-        r = requests.get(url)
-        return self.parse_text(r.text)
+    def grab(self, stocks_code):
+        stocks_dict = self.quotation.real(stocks_code)
+        # url = self.interface_url + stock_code
+        # r = requests.get(url)
+        return self.parse_dict(stocks_dict)
+
+    def parse_dict(self, stocks_dict):
+        res_dicts = []
+        for code in stocks_dict:
+            single_stock_dict = stocks_dict[code]
+            stock_name = single_stock_dict['name']
+            if code[0] in ['5', '1']:
+                price_s = '%.3f' % single_stock_dict['now']
+            else:
+                price_s = '%.2f' % single_stock_dict['now']
+            ratio_s = '%.2f%%' % single_stock_dict['涨跌(%)']
+            high_ratio = (single_stock_dict['high'] - single_stock_dict['close']) / single_stock_dict['close'] * 100.0
+            high_ratio_s = '%.2f%%' % high_ratio
+            low_ratio = (single_stock_dict['low'] - single_stock_dict['close']) / single_stock_dict['close'] * 100.0
+            low_ratio_s = '%.2f%%' % low_ratio
+            current_date = str(single_stock_dict['datetime'].date())
+            current_time = str(single_stock_dict['datetime'].time())
+            res_dict = dict(stock_name=stock_name, ratio=ratio_s, current_price=price_s,
+                            today_high=high_ratio_s, today_low=low_ratio_s,
+                            current_date=current_date, current_time=current_time)
+            res_dicts.append(res_dict)
+        return res_dicts
 
     def parse_text(self, text: str):
         try:
@@ -43,4 +68,5 @@ class Price_Grabber(object):
 
 if __name__ == '__main__':
     pg = Price_Grabber()
-    print(pg.grab('sz300059'))
+    dict = pg.grab(['sz000001', 'sh600000'])
+    print(dict)
