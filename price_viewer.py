@@ -90,4 +90,4 @@ if __name__ == '__main__':
                               'today_low', 'today_high', 'time']))
         print(stock_table.get_string(fields=['stock_code', ' stock_name ', ' price ', ' ratio ', 'volatility',
                               'today_low', 'today_high', 'time'], sortby="ratio_f"))
-        time.sleep(5.0)
+        time.sleep(4.5)

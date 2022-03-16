@@ -5,7 +5,8 @@ import easyquotation
 
 class Price_Grabber(object):
     def __init__(self):
-        self.quotation = easyquotation.use('tencent')  # 新浪 ['sina'] 腾讯 ['tencent', 'qq']
+        self.interface_name = 'tencent'
+        self.quotation = easyquotation.use(self.interface_name)  # 新浪 ['sina'] 腾讯 ['tencent', 'qq']
         # self.interface_url = 'http://hq.sinajs.cn/list='
 
     def grab(self, stocks_code):
@@ -15,6 +16,7 @@ class Price_Grabber(object):
         return self.parse_dict(stocks_dict)
 
     def parse_dict(self, stocks_dict):
+        # print(stocks_dict)
         res_dicts = []
         for code in stocks_dict:
             single_stock_dict = stocks_dict[code]
@@ -23,13 +25,21 @@ class Price_Grabber(object):
                 price_s = '%.3f' % single_stock_dict['now']
             else:
                 price_s = '%.2f' % single_stock_dict['now']
-            ratio_s = '%.2f%%' % single_stock_dict['涨跌(%)']
+            if self.interface_name == 'tencent':
+                ratio_s = '%.2f%%' % single_stock_dict['涨跌(%)']
+            else:
+                ratio_f = (single_stock_dict['now'] - single_stock_dict['close']) / single_stock_dict['close'] * 100.0
+                ratio_s = '%.2f%%' % ratio_f
             high_ratio = (single_stock_dict['high'] - single_stock_dict['close']) / single_stock_dict['close'] * 100.0
             high_ratio_s = '%.2f%%' % high_ratio
             low_ratio = (single_stock_dict['low'] - single_stock_dict['close']) / single_stock_dict['close'] * 100.0
             low_ratio_s = '%.2f%%' % low_ratio
-            current_date = str(single_stock_dict['datetime'].date())
-            current_time = str(single_stock_dict['datetime'].time())
+            if self.interface_name == 'tencent':
+                current_date = str(single_stock_dict['datetime'].date())
+                current_time = str(single_stock_dict['datetime'].time())
+            else:
+                current_date = single_stock_dict['date']
+                current_time = single_stock_dict['time']
             res_dict = dict(stock_name=stock_name, ratio=ratio_s, current_price=price_s,
                             today_high=high_ratio_s, today_low=low_ratio_s,
                             current_date=current_date, current_time=current_time)
