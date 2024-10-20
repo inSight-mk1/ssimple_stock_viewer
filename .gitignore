@@ -1,5 +1,4 @@
-stock_list.txt
-index_list.txt
+*.txt
 .*/
 .*
 __pycache__/

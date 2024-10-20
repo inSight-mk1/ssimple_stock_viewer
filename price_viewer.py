@@ -4,7 +4,6 @@ import time
 from time_domain_list import TimeDomainList
 
 
-
 if __name__ == '__main__':
     pg = Price_Grabber()
     stock_list = []
@@ -31,10 +30,10 @@ if __name__ == '__main__':
     for index_code in index_list:
         tdl = TimeDomainList(element_cnt=10)
         index_tdl.append(tdl)
-    main_table = PrettyTable(['stock_code', ' stock_name ', ' price ', ' ratio ', 'volatility',
+    main_table = PrettyTable(['volatility', 'stock_code', ' stock_name ', ' price ', ' ratio ',
                               'today_low', 'today_high', 'time', 'ratio_f'])
 
-    while (True):
+    while 1:
         stock_table = main_table[:]
         res_list = pg.grab(stock_list)
         for i, res in enumerate(res_list):
@@ -57,9 +56,9 @@ if __name__ == '__main__':
                     volatility_ratio = stock_tdl[i].list[-1] - max(stock_tdl[i].list)
                 volatility_s = "%.2f%%" % volatility_ratio
 
-            stock_table.add_row([stock_code, res['stock_name'],
-                                   res['current_price'], ratio, volatility_s,
-                                   res['today_low'], res['today_high'], res['current_time'], rf])
+            stock_table.add_row([volatility_s, stock_code, res['stock_name'],
+                                res['current_price'], ratio,
+                                res['today_low'], res['today_high'], res['current_time'], rf])
         index_table = main_table[:]
 
         res_list = pg.grab(index_list)
@@ -80,14 +79,14 @@ if __name__ == '__main__':
                 volatility_s = "%.2f%%" % volatility_ratio
             ratio = res['ratio']
             rf = float(ratio[:-1])
-            index_table.add_row([index_code, res['stock_name'],
-                                   res['current_price'], ratio, volatility_s,
-                                   res['today_low'], res['today_high'], res['current_time'], rf])
+            index_table.add_row([volatility_s, index_code, res['stock_name'],
+                                res['current_price'], ratio,
+                                res['today_low'], res['today_high'], res['current_time'], rf])
         print(time.strftime('%H:%M:%S', time.localtime(time.time())))
         stock_table.align = "r"
         index_table.align = "r"
-        print(index_table.get_string(fields=['stock_code', ' stock_name ', ' price ', ' ratio ', 'volatility',
+        print(index_table.get_string(fields=['volatility', 'stock_code', ' stock_name ', ' price ', ' ratio ',
                               'today_low', 'today_high', 'time']))
-        print(stock_table.get_string(fields=['stock_code', ' stock_name ', ' price ', ' ratio ', 'volatility',
+        print(stock_table.get_string(fields=['volatility', 'stock_code', ' stock_name ', ' price ', ' ratio ',
                               'today_low', 'today_high', 'time'], sortby="ratio_f"))
         time.sleep(4.5)
