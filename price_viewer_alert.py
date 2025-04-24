@@ -1,6 +1,7 @@
 from price_grabber import Price_Grabber
 from prettytable import PrettyTable
 import time
+import json
 from time_domain_list import TimeDomainList
 from stock_alert_parser import StockAlertParser, Alert
 
@@ -12,6 +13,8 @@ KEEP = True
 NOT_KEEP = False
 ALERT = True
 NO_ALERT = False
+
+# , "000338", "002745", "603897", "000568", "002690"
 
 
 # def check_alerts(stock_code, current_value, alerts):
@@ -61,9 +64,12 @@ if __name__ == '__main__':
     index_parser.parse()
     index_list, index_alerts = index_parser.get_results()
 
+    with open('portfolio.json', 'r') as f:
+        portfolio = json.load(f)
+
     # 使用 TimeDomainList 存储股价
-    stock_tdl = [TimeDomainList(element_cnt=10) for _ in stock_list]
-    index_tdl = [TimeDomainList(element_cnt=10) for _ in index_list]
+    stock_tdl = [TimeDomainList(element_cnt=20) for _ in stock_list]
+    index_tdl = [TimeDomainList(element_cnt=20) for _ in index_list]
 
     main_table = PrettyTable(
         ['volatility', 'code', 'name', 'price', 'ratio', 'today_low', 'today_high', 'time', 'ratio_f'])
@@ -73,6 +79,7 @@ if __name__ == '__main__':
     # RESET = "\033[0m"
 
     while True:
+        t_start = time.time()
         stock_table = main_table[:]
         index_table = main_table[:]
 
@@ -147,7 +154,24 @@ if __name__ == '__main__':
             index_table.add_row([volatility_s, index_code, res['stock_name'], price_s, ratio,
                                  res['today_low'], res['today_high'], res['current_time'], rf])
 
-        print(time.strftime('%H:%M:%S', time.localtime(time.time())))
+        for portfolio_name in portfolio.keys():
+            p_stock_list = portfolio[portfolio_name]
+            total_ratio = 0
+            p_stock_res = pg.grab(p_stock_list)
+            if len(p_stock_res) == 0:
+                print("No result of pg.grab(), Check network.")
+                time.sleep(1.0)
+                continue
+            for res in p_stock_res:
+                total_ratio += float(res['ratio'][:-1])
+            avg_ratio_f = total_ratio / len(p_stock_list)
+            avg_ratio = '%.2f%%' % avg_ratio_f
+            index_table.add_row(['', portfolio_name,
+                        '', '', avg_ratio,
+                        '', '', res['current_time'], rf])
+
+        t_end = time.time()
+        print(time.strftime('%H:%M:%S', time.localtime(time.time())), f'取数据时间：{t_end - t_start:.3f}s')
         stock_table.align = "r"
         index_table.align = "r"
         print(index_table.get_string(
@@ -155,4 +179,4 @@ if __name__ == '__main__':
         print(stock_table.get_string(
             fields=['volatility', 'code', 'name', 'price', 'ratio', 'today_low', 'today_high', 'time'],
             sortby="ratio_f"))
-        time.sleep(4.5)
+        time.sleep(2.45)

@@ -6,7 +6,7 @@ import easyquotation
 class Price_Grabber(object):
     def __init__(self):
         self.interface_name = 'tencent'
-        self.quotation = easyquotation.use(self.interface_name)  # 新浪 ['sina'] 腾讯 ['tencent', 'qq']
+        self.quotation = easyquotation.use(self.interface_name)  # 新浪 ['sina'] 腾讯 ['tencent', 'qq', 'hkquote']
         # self.interface_url = 'http://hq.sinajs.cn/list='
 
     def grab(self, stocks_code):
@@ -78,5 +78,5 @@ class Price_Grabber(object):
 
 if __name__ == '__main__':
     pg = Price_Grabber()
-    dict = pg.grab(['sz000001', 'sh600000'])
+    dict = pg.grab(['832522'])
     print(dict)
