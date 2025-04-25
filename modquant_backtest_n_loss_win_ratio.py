@@ -1,170 +1,171 @@
-def analyze_win_rate_strategy(file_path, consecutive_losses=2, target_win_rate=40.0):
+import pandas as pd
+import numpy as np
+
+
+def analyze_strategy_from_csv(csv_path, consecutive_losses=2, target_win_rate=40.0):
     """
-    分析连败后跟单直到达到目标胜率的策略
-
-    参数:
-    file_path (str): 包含胜负序列的文件路径
-    consecutive_losses (int): 触发跟单的连续亏损次数
-    target_win_rate (float): 停止跟单的目标胜率(%)
-
-    返回:
-    dict: 包含跟单结果的字典
+    按照连败跟单策略，基于csv每段交易详情进行回测，
+    统计策略交易的胜率、赔率、胜负中位数、最大连败次数、总盈利
     """
-    # 读取胜负序列
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            win_lose_sequence = f.read().strip()
-    except Exception as e:
-        print(f"读取文件时出错: {e}")
-        return None
+    df = pd.read_csv(csv_path, encoding='utf-8')
+    # 兼容无表头情况
+    if df.columns[0] != '段号' and not df.columns[0].startswith('Unnamed'):
+        df.columns = ['段号','交易方向','开始日期','结束日期','交易笔数','盈利笔数','亏损笔数','总盈亏','结果']
 
-    # 检查序列是否为空
-    if not win_lose_sequence:
-        print("胜负序列为空")
-        return None
+    results_seq = df['结果'].tolist()
+    profits_seq = df['总盈亏'].tolist()
 
-    print(f"原始胜负序列: {win_lose_sequence}")
-    print(f"策略: 等待{consecutive_losses}连败后跟单，直到胜率达到{target_win_rate}%")
+    # 策略回测主逻辑
+    following = False
+    loss_count = 0
+    follow_indices = []  # 记录所有被策略选中的段的索引
+    current_follow = []  # 当前一轮跟单的索引
 
-    # 初始化变量
-    following = False  # 是否处于跟单状态
-    loss_count = 0  # 当前连败计数
-
-    follow_trades = []  # 记录所有跟单交易
-    current_follow_streak = []  # 当前一轮跟单
-
-    # 遍历胜负序列
-    for i, result in enumerate(win_lose_sequence):
-        if not following:  # 未在跟单状态
+    for i, result in enumerate(results_seq):
+        if not following:
             if result == '负':
                 loss_count += 1
                 if loss_count >= consecutive_losses:
-                    # 触发跟单条件
                     following = True
                     loss_count = 0
-                    print(f"位置 {i + 1}: 检测到{consecutive_losses}连败，开始跟单")
-                    # 当前这个负也要算作跟单中的一个
-                    current_follow_streak.append(result)
+                    current_follow = [i]
             else:
-                # 遇到胜，重置连败计数
                 loss_count = 0
-        else:  # 已在跟单状态
-            # 记录当前交易
-            current_follow_streak.append(result)
-
-            # 计算当前胜率
-            wins_count = current_follow_streak.count('胜')
-            current_win_rate = (wins_count / len(current_follow_streak)) * 100
-
-            # 检查是否达到目标胜率
-            if current_win_rate >= target_win_rate:
-                # 跟单胜率达标，停止跟单
+        else:
+            current_follow.append(i)
+            # 统计当前跟单胜率
+            streak_results = [results_seq[idx] for idx in current_follow]
+            wins = streak_results.count('胜')
+            win_rate = wins / len(streak_results) * 100
+            if win_rate >= target_win_rate:
+                follow_indices.extend(current_follow)
                 following = False
-                follow_trades.append(current_follow_streak)
-                print(
-                    f"位置 {i + 1}: 跟单胜率达到{current_win_rate:.2f}%，结束本轮跟单，本轮结果: {''.join(current_follow_streak)}")
-                current_follow_streak = []
+                current_follow = []
+    # 处理结尾还在跟单的情况
+    if following and current_follow:
+        follow_indices.extend(current_follow)
 
-    # 处理序列结束时仍在跟单的情况
-    if following and current_follow_streak:
-        wins_count = current_follow_streak.count('胜')
-        current_win_rate = (wins_count / len(current_follow_streak)) * 100
-        follow_trades.append(current_follow_streak)
-        print(
-            f"序列结束，最后一轮跟单未达到目标胜率，当前胜率: {current_win_rate:.2f}%，结果: {''.join(current_follow_streak)}")
+    # 去重并保持顺序
+    follow_indices = sorted(set(follow_indices), key=follow_indices.index)
 
-    # 统计结果
-    total_followed = sum(len(streak) for streak in follow_trades)
-    wins = sum(streak.count('胜') for streak in follow_trades)
-    losses = sum(streak.count('负') for streak in follow_trades)
+    # 提取策略选中的段的数据
+    strat_df = df.iloc[follow_indices]
+    strat_results = strat_df['结果'].tolist()
+    strat_profits = strat_df['总盈亏'].tolist()
 
-    # 计算每轮跟单的结果
-    round_results = []
-    for i, streak in enumerate(follow_trades):
-        round_wins = streak.count('胜')
-        round_losses = streak.count('负')
-        round_win_rate = (round_wins / len(streak)) * 100 if len(streak) > 0 else 0
-        round_results.append({
-            '轮次': i + 1,
-            '跟单次数': len(streak),
-            '胜': round_wins,
-            '负': round_losses,
-            '胜率': round_win_rate,
-            '结果': ''.join(streak)
-        })
+    win_count = strat_results.count('胜')
+    lose_count = strat_results.count('负')
+    total = len(strat_results)
+    win_rate = win_count / total if total > 0 else 0
 
-    # 计算总体胜率
-    win_rate = wins / total_followed * 100 if total_followed > 0 else 0
+    win_profit = strat_df[strat_df['结果']=='胜']['总盈亏'].sum()
+    lose_profit = strat_df[strat_df['结果']=='负']['总盈亏'].sum()
+    payout_ratio = win_profit / abs(lose_profit) if lose_profit != 0 else np.nan
 
+    win_median = strat_df[strat_df['结果']=='胜']['总盈亏'].median() if win_count > 0 else np.nan
+    lose_median = strat_df[strat_df['结果']=='负']['总盈亏'].median() if lose_count > 0 else np.nan
+
+    # 最大连败次数（只统计策略选中的段）
+    max_consec_lose = 0
+    current_lose = 0
+    for res in strat_results:
+        if res == '负':
+            current_lose += 1
+            max_consec_lose = max(max_consec_lose, current_lose)
+        else:
+            current_lose = 0
+
+    total_profit = sum(strat_profits)
+
+    # 输出
+    print(f"策略实际交易段数: {total}")
+    print(f"策略胜率: {win_rate*100:.2f}% ({win_count}/{total})")
+    print(f"策略赔率(盈亏比): {payout_ratio:.2f}")
+    print(f"策略胜的中位数: {win_median}")
+    print(f"策略负的中位数: {lose_median}")
+    print(f"策略最大连败次数: {max_consec_lose}")
+    print(f"策略总盈利: {total_profit}")
+    print("-"*40)
+
+    # 全跟单策略
+    all_results = df['结果'].tolist()
+    all_profits = df['总盈亏'].tolist()
+    all_win_count = all_results.count('胜')
+    all_lose_count = all_results.count('负')
+    all_total = len(all_results)
+    all_win_rate = all_win_count / all_total if all_total > 0 else 0
+    all_win_profit = df[df['结果']=='胜']['总盈亏'].sum()
+    all_lose_profit = df[df['结果']=='负']['总盈亏'].sum()
+    all_payout_ratio = all_win_profit / abs(all_lose_profit) if all_lose_profit != 0 else float('nan')
+    all_win_median = df[df['结果']=='胜']['总盈亏'].median() if all_win_count > 0 else float('nan')
+    all_lose_median = df[df['结果']=='负']['总盈亏'].median() if all_lose_count > 0 else float('nan')
+    all_max_consec_lose = 0
+    all_current_lose = 0
+    for res in all_results:
+        if res == '负':
+            all_current_lose += 1
+            all_max_consec_lose = max(all_max_consec_lose, all_current_lose)
+        else:
+            all_current_lose = 0
+    all_total_profit = sum(all_profits)
+
+    print(f"全跟单策略段数: {all_total}")
+    print(f"全跟单胜率: {all_win_rate*100:.2f}% ({all_win_count}/{all_total})")
+    print(f"全跟单赔率(盈亏比): {all_payout_ratio:.2f}")
+    print(f"全跟单胜的中位数: {all_win_median}")
+    print(f"全跟单负的中位数: {all_lose_median}")
+    print(f"全跟单最大连败次数: {all_max_consec_lose}")
+    print(f"全跟单总盈利: {all_total_profit}")
+
+    # 返回详细轮次
     return {
-        '连败触发阈值': consecutive_losses,
-        '目标胜率': target_win_rate,
-        '跟单轮数': len(follow_trades),
-        '总跟单次数': total_followed,
-        '总胜利次数': wins,
-        '总亏损次数': losses,
-        '总胜率': win_rate,
-        '详细轮次': round_results,
-        '跟单序列': [''.join(streak) for streak in follow_trades]
+        '策略交易段数': total,
+        '策略胜率': win_rate,
+        '策略赔率': payout_ratio,
+        '策略胜中位数': win_median,
+        '策略负中位数': lose_median,
+        '策略最大连败': max_consec_lose,
+        '策略总盈利': total_profit,
+        '策略明细': strat_df.reset_index(drop=True)
     }
 
 
 def main():
-    # 文件路径，应该是包含胜负序列的txt文件
-    file_path = 'ag_250424_win_lose_seq.txt'
-
-    # 设置连败阈值
+    csv_path = 'ic_250425_analysis.csv'
     try:
         consecutive_losses = int(input("请输入触发跟单的连败次数: "))
     except ValueError:
-        consecutive_losses = 2  # 默认值
+        consecutive_losses = 2
         print(f"输入有误，使用默认值: {consecutive_losses}")
-
-    # 设置目标胜率
     try:
         target_win_rate = float(input("请输入停止跟单的目标胜率(%): "))
     except ValueError:
-        target_win_rate = 40.0  # 默认值
+        target_win_rate = 40.0
         print(f"输入有误，使用默认值: {target_win_rate}%")
-
-    # 分析策略
-    results = analyze_win_rate_strategy(file_path, consecutive_losses, target_win_rate)
-
+    results = analyze_strategy_from_csv(csv_path, consecutive_losses, target_win_rate)
     if results:
-        print("\n--- 基于胜率目标的连败跟单策略分析结果 ---")
-        print(f"连败触发阈值: {results['连败触发阈值']}")
-        print(f"目标胜率: {results['目标胜率']}%")
-        print(f"跟单轮数: {results['跟单轮数']}")
-        print(f"总跟单次数: {results['总跟单次数']}")
-        print(f"总胜利次数: {results['总胜利次数']}")
-        print(f"总亏损次数: {results['总亏损次数']}")
-        print(f"总胜率: {results['总胜率']:.2f}%")
-
-        print("\n各轮次跟单详情:")
-        for round_info in results['详细轮次']:
-            print(
-                f"第{round_info['轮次']}轮: {round_info['结果']} (胜:{round_info['胜']}, 负:{round_info['负']}, 胜率:{round_info['胜率']:.2f}%)")
-
-        # 保存结果到文件
-        output_file = file_path.rsplit('_win_lose_seq.txt', 1)[
-                          0] + f'_winrate{int(target_win_rate)}_n{consecutive_losses}_analysis.txt'
+        print("\n--- 策略回测统计结果 ---")
+        print(f"策略交易段数: {results['策略交易段数']}")
+        print(f"策略胜率: {results['策略胜率']*100:.2f}%")
+        print(f"策略赔率: {results['策略赔率']:.2f}")
+        print(f"策略胜的中位数: {results['策略胜中位数']}")
+        print(f"策略负的中位数: {results['策略负中位数']}")
+        print(f"策略最大连败: {results['策略最大连败']}")
+        print(f"策略总盈利: {results['策略总盈利']}")
+        # 保存明细
+        output_file = csv_path.rsplit('.csv', 1)[0] + f'_winrate{int(target_win_rate)}_n{consecutive_losses}_strategy_analysis.txt'
         with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(f"基于胜率目标的连败跟单策略分析结果\n")
-            f.write(f"连败触发阈值: {results['连败触发阈值']}\n")
-            f.write(f"目标胜率: {results['目标胜率']}%\n")
-            f.write(f"跟单轮数: {results['跟单轮数']}\n")
-            f.write(f"总跟单次数: {results['总跟单次数']}\n")
-            f.write(f"总胜利次数: {results['总胜利次数']}\n")
-            f.write(f"总亏损次数: {results['总亏损次数']}\n")
-            f.write(f"总胜率: {results['总胜率']:.2f}%\n\n")
-
-            f.write("各轮次跟单详情:\n")
-            for round_info in results['详细轮次']:
-                f.write(
-                    f"第{round_info['轮次']}轮: {round_info['结果']} (胜:{round_info['胜']}, 负:{round_info['负']}, 胜率:{round_info['胜率']:.2f}%)\n")
-
-        print(f"\n分析结果已保存至: {output_file}")
-
+            f.write(f"策略回测统计结果\n")
+            f.write(f"策略交易段数: {results['策略交易段数']}\n")
+            f.write(f"策略胜率: {results['策略胜率']*100:.2f}%\n")
+            f.write(f"策略赔率: {results['策略赔率']:.2f}\n")
+            f.write(f"策略胜的中位数: {results['策略胜中位数']}\n")
+            f.write(f"策略负的中位数: {results['策略负中位数']}\n")
+            f.write(f"策略最大连败: {results['策略最大连败']}\n")
+            f.write(f"策略总盈利: {results['策略总盈利']}\n\n")
+            f.write("策略明细:\n")
+            results['策略明细'].to_string(f, index=False)
+        print(f"\n策略明细已保存至: {output_file}")
 
 if __name__ == "__main__":
     main()

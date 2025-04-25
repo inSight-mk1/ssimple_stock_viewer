@@ -47,14 +47,47 @@ def analyze_trades(file_path):
     # 添加交易方向列
     df['交易方向'] = np.where(df['进场价格'] > 0, '多', '空')
 
-    # 找出方向转变的点
-    direction_changes = df['交易方向'].ne(df['交易方向'].shift()).cumsum()
+    # 改进后的震荡过滤逻辑（带详细注释）
+    direction_series = df['交易方向'].values
+    group_ids = []
+    current_group = 0
+    main_direction = direction_series[0] if len(direction_series) > 0 else None
+    reverse_count = 0
+    reverse_indices = []
+
+    for i, d in enumerate(direction_series):
+        if d == main_direction:
+            reverse_count = 0
+            reverse_indices = []
+            group_ids.append(current_group)
+        else:
+            reverse_count += 1
+            reverse_indices.append(i)
+            group_ids.append(current_group)
+            if reverse_count == 3:
+                # 从第一次反向单开始新段
+                for j in range(reverse_indices[0], i+1):
+                    group_ids[j] = current_group + 1
+                current_group += 1
+                main_direction = direction_series[reverse_indices[0]]
+                reverse_count = 0
+                reverse_indices = []
+
+    # 如果最后还有未切分的，全部归入最后一段
+    if reverse_indices and len(reverse_indices) < 3:
+        for j in range(reverse_indices[0], len(direction_series)):
+            group_ids[j] = current_group
+        for j in range(i+1, len(direction_series)):
+            group_ids[j] = current_group
+
+    
+    df['段落ID'] = group_ids
 
     # 分析结果
     results = []
 
     # 按段分组计算
-    for segment_id, segment in df.groupby(direction_changes):
+    for segment_id, segment in df.groupby('段落ID'):
         direction = segment['交易方向'].iloc[0]
         total_profit = segment['单笔盈亏'].sum()
         win_count = len(segment[segment['单笔盈亏'] > 0])
@@ -80,7 +113,7 @@ def analyze_trades(file_path):
 
 
 def main():
-    file_path = 'ag_250424.txt'
+    file_path = 'ic_250425.txt'
     results = analyze_trades(file_path)
 
     if results is not None:
