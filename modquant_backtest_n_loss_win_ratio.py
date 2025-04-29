@@ -131,7 +131,7 @@ def analyze_strategy_from_csv(csv_path, consecutive_losses=2, target_win_rate=40
 
 
 def main():
-    csv_path = 'ic_250425_analysis.csv'
+    csv_path = 'im_250425_analysis.csv'
     try:
         consecutive_losses = int(input("请输入触发跟单的连败次数: "))
     except ValueError:

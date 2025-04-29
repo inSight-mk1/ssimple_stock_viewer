@@ -113,7 +113,7 @@ def analyze_trades(file_path):
 
 
 def main():
-    file_path = 'ic_250425.txt'
+    file_path = 'im_250425.txt'
     results = analyze_trades(file_path)
 
     if results is not None:
