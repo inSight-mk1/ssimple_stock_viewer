@@ -1,4 +1,42 @@
-from plyer import notification
+import platform
+import subprocess
+
+
+def send_notification(title, message, app_name='ssviewer', timeout=10):
+    """跨平台通知函数，支持 macOS 和 Windows"""
+    system = platform.system()
+    
+    if system == 'Darwin':  # macOS
+        # 使用 terminal-notifier 发送通知（需要 brew install terminal-notifier）
+        try:
+            subprocess.run([
+                'terminal-notifier',
+                '-title', title,
+                '-message', message,
+                '-sound', 'default'
+            ], check=False)
+        except FileNotFoundError:
+            # 回退到 osascript
+            script = f'display notification "{message}" with title "{title}"'
+            subprocess.run(['osascript', '-e', script], check=False)
+    elif system == 'Windows':
+        # Windows 使用 plyer
+        try:
+            from plyer import notification
+            notification.notify(
+                title=title,
+                message=message,
+                app_name=app_name,
+                timeout=timeout
+            )
+        except Exception as e:
+            print(f"Windows notification failed: {e}")
+    else:  # Linux 或其他系统
+        try:
+            # 尝试使用 notify-send (Linux)
+            subprocess.run(['notify-send', title, message], check=False)
+        except FileNotFoundError:
+            print(f"Notification: {title} - {message}")
 
 
 class Alert:
@@ -14,7 +52,7 @@ class Alert:
                 self.price.startswith('-') and current_price <= threshold):
             if not self.triggered:
                 self.triggered = True  # 标记为已触发
-                notification.notify(
+                send_notification(
                     title='ALERT ONCE',
                     message=f'{self.stock_code} has reached the threshold {threshold}.',
                     app_name='ssviewer',
